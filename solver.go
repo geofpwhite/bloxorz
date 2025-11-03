@@ -46,12 +46,12 @@ func solve(s state) ([]string, [][][2]int) {
 		g.Close()
 	}()
 	queue := make([]solverNode, 0)
-	start := solverNode{visitedNode{nil, 1, 1, -1, -1}, nil, nil, nil, 0, make(map[[2]int]struct{})}
+	start := solverNode{visitedNode{nil, s.block.coords[0][0], s.block.coords[0][1], -1, -1}, nil, nil, nil, 0, make(map[[2]int]struct{})}
 	start.visitedNode.sNode = &start
 	queue = append(queue, start)
 	gQueue := make([]*cgraph.Node, 0)
 	bQueue := make([]block, 0)
-	visited := make(map[visitedNode]int)
+	visited := make(map[string]int)
 	block := block{coords: [][2]int{{4, 1}}, orientation: UPRIGHT}
 	bQueue = append(bQueue, block)
 	nodes := make(map[string]*cgraph.Node)
@@ -68,63 +68,88 @@ outer:
 		bQueue = bQueue[1:]
 		n := gQueue[0]
 		gQueue = gQueue[1:]
-		visited[cur.visitedNode] = cur.curPath
-		if button, ok := s.buttons[[2]int{cur.bx1, cur.by1}]; ok {
-			on := false
-			if (button.mustBeUpright && b.orientation == UPRIGHT) || !button.mustBeUpright {
-				for _, coords := range button.tilesToToggle {
-					if _, ok := cur.onButtonTiles[coords]; ok {
-						delete(cur.onButtonTiles, coords)
-						continue
-					}
-					cur.onButtonTiles[coords] = struct{}{}
-					on = true
-				}
-				fmt.Println("button pressed", on)
-			}
-		}
-		if button, ok := s.buttons[[2]int{cur.bx2, cur.by2}]; ok && cur.bx2 != 0 && cur.by2 != 0 {
-			on := false
-			if !button.mustBeUpright {
-				for _, coords := range button.tilesToToggle {
-					if _, ok := cur.onButtonTiles[coords]; ok {
-						delete(cur.onButtonTiles, coords)
-					} else {
-						cur.onButtonTiles[coords] = struct{}{}
-						on = true
-					}
-				}
-				fmt.Println("button pressed", on)
-			}
-		}
+		var buttonPressed bool
+		// if num, ok := visited[cur.visitedNode.String()]; ok && num < cur.curPath {
+		// 	fmt.Println(num, cur.curPath)
+		// 	continue
+		// }
+		visited[cur.visitedNode.String()] = cur.curPath
 		for _, b := range s.buttons {
 			if b.on {
 				b.press()
 			}
 		}
 		for c := range cur.onButtonTiles {
-			s.floor[c] = true
+			s.buttons[c].press()
 		}
 		// g := graph.
 		for i := range 4 {
 			d := direction(i)
-			if cur.prevMove != nil && opposite(*cur.prevMove, d) {
+			if cur.prevMove != nil && opposite(*cur.prevMove, d) && !buttonPressed {
 				continue
 			}
 			newBlock := b.Move(d)
 			m := make(map[[2]int]struct{})
 			maps.Copy(m, cur.onButtonTiles)
-			newNode := solverNode{prevMove: &d, visitedNode: visitedNode{bx1: newBlock.coords[0][0], by1: newBlock.coords[0][1], bx2: -1, by2: -1}, prevNode: &cur, curPath: cur.curPath + 1, prevBlock: &b, onButtonTiles: m}
+			newNode := solverNode{prevMove: &d,
+				visitedNode: visitedNode{bx1: newBlock.coords[0][0],
+					by1: newBlock.coords[0][1],
+					bx2: -1,
+					by2: -1,
+				},
+				prevNode:      &cur,
+				curPath:       cur.curPath + 1,
+				prevBlock:     &b,
+				onButtonTiles: m,
+			}
 			newNode.visitedNode.sNode = &newNode
 			if len(newBlock.coords) > 1 {
 				newNode.bx2 = newBlock.coords[1][0]
 				newNode.by2 = newBlock.coords[1][1]
 			}
-			// if num, ok := visited[newNode.visitedNode]; ok && num < newNode.curPath {
+			if button, ok := s.buttons[[2]int{newNode.bx1, newNode.by1}]; ok {
+				on := false
+				if (button.mustBeUpright && b.orientation == UPRIGHT) || !button.mustBeUpright {
+					coords := [2]int{newNode.bx1, newNode.by1}
+					if _, ok := newNode.onButtonTiles[coords]; ok {
+						fmt.Println("continue outer", len(newNode.onButtonTiles))
+						continue outer
+					} else {
+						newNode.onButtonTiles[coords] = struct{}{}
+						on = true
+						queue = queue[0:0]
+						gQueue = gQueue[0:0]
+						bQueue = bQueue[0:0]
+					}
+					buttonPressed = true
+					fmt.Println("button pressed", on)
+				}
+			}
+			if button, ok := s.buttons[[2]int{newNode.bx2, newNode.by2}]; ok && newNode.bx2 != -1 && newNode.by2 != -1 {
+				on := false
+				if !button.mustBeUpright {
+					coords := [2]int{newNode.bx2, newNode.by2}
+					if _, ok := newNode.onButtonTiles[coords]; ok {
+						fmt.Println("continue outer", len(newNode.onButtonTiles))
+
+						continue
+					} else {
+						newNode.onButtonTiles[coords] = struct{}{}
+						on = true
+						queue = make([]solverNode, 0)
+						gQueue = make([]*cgraph.Node, 0)
+						bQueue = bQueue[0:0]
+					}
+					buttonPressed = true
+					fmt.Println("button pressed", on)
+				}
+			}
+			// if num, ok := visited[newNode.visitedNode.String()]; ok && num < newNode.curPath {
+			// 	fmt.Println(num, newNode.curPath)
 			// 	continue
 			// }
 			checkVal := check(s, newBlock)
-			fmt.Println(checkVal, newBlock.coords, d.String())
+			fmt.Println(len(s.floor), len(newNode.onButtonTiles), checkVal, newBlock.coords, d.String())
 			node, err := graph.CreateNodeByName(newNode.visitedNode.String())
 			if err != nil {
 				panic("error creating node")
@@ -142,6 +167,7 @@ outer:
 				continue
 			case WIN:
 				done = &newNode
+				fmt.Println("win")
 				break outer
 			}
 			gQueue = append(gQueue, node)
@@ -158,9 +184,11 @@ outer:
 	path := []string{}
 	coordPath := [][][2]int{}
 	for cur.prevMove != nil {
+		str := cur.prevNode.String() + "-" + cur.String()
 		path = append(path, cur.prevMove.String())
 		coordPath = append(coordPath, cur.prevBlock.coords)
-		e := edges[cur.prevNode.String()+"-"+cur.String()]
+		e := edges[str]
+		fmt.Println(str, e)
 		e.SetColor(tcolor.Green.String())
 		cur = cur.prevNode
 	}
@@ -195,7 +223,7 @@ outer:
 
 func check(s state, b block) result {
 	for _, c := range b.coords {
-		if _, ok := s.floor[c]; !ok {
+		if exists, ok := s.floor[c]; !ok || !exists {
 			return LOSE
 		}
 	}

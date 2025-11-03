@@ -20,14 +20,8 @@ func (s *state) NewButton(coords [2]int, on, mustBeUpright bool, tiles [][2]int)
 
 func (b *button) press() {
 	b.on = !b.on
-	if !b.on {
-		for _, c := range b.tilesToToggle {
-			b.state.floor[c] = false
-		}
-	} else {
-		for _, c := range b.tilesToToggle {
-			b.state.floor[c] = true
-		}
+	for _, c := range b.tilesToToggle {
+		b.state.floor[c] = b.on
 	}
 }
 
