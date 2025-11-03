@@ -1,17 +1,31 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"fortio.org/terminal/ansipixels"
 )
 
 func main() {
+	outputGraphFlag := flag.Bool("graph", false, "Graph state space of current level")
+	levelFlag := flag.Int("level", 1, "choose your level")
+	flag.Parse()
 	ap := ansipixels.NewAnsiPixels(60)
-	s := LevelTwo()
-	path, coords := solve(s)
+	level := LevelOne
+	switch *levelFlag {
+	case 2:
+		level = LevelTwo
+	}
+	s := level()
+	if *outputGraphFlag {
+		path, coords := solve(s)
+		defer func() {
+			fmt.Println(path)
+			fmt.Println(coords)
+		}()
+	}
 	curSteps := make([]direction, 0)
-	fmt.Scanln()
 	ap.Open()
 	ap.HideCursor()
 	ap.ClearScreen()
@@ -19,9 +33,6 @@ func main() {
 		ap.ClearScreen()
 		ap.ShowCursor()
 		ap.Restore()
-		fmt.Println(path)
-		fmt.Println(coords)
-		fmt.Println(curSteps)
 	}()
 	ap.FPSTicks(func() bool {
 		if len(ap.Data) > 0 && ap.Data[0] == 'q' {
@@ -32,27 +43,30 @@ func main() {
 			case 'A':
 				s.block = s.block.Move(UP)
 				curSteps = append(curSteps, UP)
+				s.checkButtons()
 			case 'B':
 				s.block = s.block.Move(DOWN)
 				curSteps = append(curSteps, DOWN)
+				s.checkButtons()
 			case 'C':
 				s.block = s.block.Move(RIGHT)
 				curSteps = append(curSteps, RIGHT)
+				s.checkButtons()
 			case 'D':
 				s.block = s.block.Move(LEFT)
 				curSteps = append(curSteps, LEFT)
+				s.checkButtons()
 			}
 		}
 		ap.ClearScreen()
 		result := CheckState(s)
-		s.checkButtons()
 		switch result {
 		case LOSE:
-			s = LevelTwo()
+			s = level()
 		case WIN:
 			return false
 		}
-		DrawGame(ap, s)
+		DrawGame(ap, &s)
 		return true
 	})
 }

@@ -3,8 +3,8 @@ package main
 type state struct {
 	block     block
 	endCoords [2]int
-	floor     map[[2]int]struct{}
-	buttons   map[[2]int]button
+	floor     map[[2]int]bool
+	buttons   map[[2]int]*button
 }
 
 type button struct {
@@ -15,23 +15,20 @@ type button struct {
 }
 
 func (s *state) NewButton(coords [2]int, on, mustBeUpright bool, tiles [][2]int) {
-	s.buttons[coords] = button{on, mustBeUpright, tiles, s}
+	s.buttons[coords] = &button{on, mustBeUpright, tiles, s}
 }
-func (b button) press() {
+
+func (b *button) press() {
 	b.on = !b.on
-	toggle := func() {
-		for _, coords := range b.tilesToToggle {
-			b.state.floor[coords] = struct{}{}
-		}
-	}
 	if !b.on {
-		toggle = func() {
-			for _, coords := range b.tilesToToggle {
-				delete(b.state.floor, coords)
-			}
+		for _, c := range b.tilesToToggle {
+			b.state.floor[c] = false
+		}
+	} else {
+		for _, c := range b.tilesToToggle {
+			b.state.floor[c] = true
 		}
 	}
-	toggle()
 }
 
 type (
@@ -147,8 +144,8 @@ const (
 
 func CheckState(s state) result {
 	for _, c := range s.block.coords {
-		_, ok := s.floor[c]
-		if !ok {
+		exists, ok := s.floor[c]
+		if !ok || !exists {
 			return LOSE
 		}
 	}

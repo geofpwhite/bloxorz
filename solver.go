@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"image/png"
@@ -25,6 +24,7 @@ type solverNode struct {
 }
 
 type visitedNode struct {
+	sNode              *solverNode
 	bx1, by1, bx2, by2 int
 }
 
@@ -46,7 +46,9 @@ func solve(s state) ([]string, [][][2]int) {
 		g.Close()
 	}()
 	queue := make([]solverNode, 0)
-	queue = append(queue, solverNode{visitedNode{1, 1, -1, -1}, nil, nil, nil, 0, make(map[[2]int]struct{})})
+	start := solverNode{visitedNode{nil, 1, 1, -1, -1}, nil, nil, nil, 0, make(map[[2]int]struct{})}
+	start.visitedNode.sNode = &start
+	queue = append(queue, start)
 	gQueue := make([]*cgraph.Node, 0)
 	bQueue := make([]block, 0)
 	visited := make(map[visitedNode]int)
@@ -73,10 +75,10 @@ outer:
 				for _, coords := range button.tilesToToggle {
 					if _, ok := cur.onButtonTiles[coords]; ok {
 						delete(cur.onButtonTiles, coords)
-					} else {
-						cur.onButtonTiles[coords] = struct{}{}
-						on = true
+						continue
 					}
+					cur.onButtonTiles[coords] = struct{}{}
+					on = true
 				}
 				fmt.Println("button pressed", on)
 			}
@@ -101,7 +103,7 @@ outer:
 			}
 		}
 		for c := range cur.onButtonTiles {
-			s.floor[c] = struct{}{}
+			s.floor[c] = true
 		}
 		// g := graph.
 		for i := range 4 {
@@ -113,6 +115,7 @@ outer:
 			m := make(map[[2]int]struct{})
 			maps.Copy(m, cur.onButtonTiles)
 			newNode := solverNode{prevMove: &d, visitedNode: visitedNode{bx1: newBlock.coords[0][0], by1: newBlock.coords[0][1], bx2: -1, by2: -1}, prevNode: &cur, curPath: cur.curPath + 1, prevBlock: &b, onButtonTiles: m}
+			newNode.visitedNode.sNode = &newNode
 			if len(newBlock.coords) > 1 {
 				newNode.bx2 = newBlock.coords[1][0]
 				newNode.by2 = newBlock.coords[1][1]
@@ -123,10 +126,10 @@ outer:
 			checkVal := check(s, newBlock)
 			fmt.Println(checkVal, newBlock.coords, d.String())
 			node, err := graph.CreateNodeByName(newNode.visitedNode.String())
-			nodes[newNode.visitedNode.String()] = node
 			if err != nil {
-				panic("f")
+				panic("error creating node")
 			}
+			nodes[newNode.visitedNode.String()] = node
 			key := cur.visitedNode.String() + "-" + newNode.String()
 
 			e, err := graph.CreateEdgeByName(key, n, node)
@@ -140,12 +143,10 @@ outer:
 			case WIN:
 				done = &newNode
 				break outer
-				// continue
 			}
 			gQueue = append(gQueue, node)
 			queue = append(queue, newNode)
 			bQueue = append(bQueue, newBlock)
-
 		}
 	}
 	if done == nil {
@@ -165,26 +166,30 @@ outer:
 	}
 	slices.Reverse(path)
 	slices.Reverse(coordPath)
-	var buf bytes.Buffer
+	// var buf bytes.Buffer
+
 	img, err := g.RenderImage(ctx, graph)
 	if err != nil {
+		panic("error rendering")
 	}
+	fmt.Println("creating")
 	file, err := os.Create("output.png")
 	if err != nil {
 		log.Fatalf("failed to create file: %v", err)
 	}
 
-	defer file.Close() // Ensure the file is closed
+	defer file.Close()
 
-	// Encode the image to the file in PNG format
+	fmt.Println("encoding")
 	err = png.Encode(file, img)
 	if err != nil {
 		log.Fatalf("failed to encode image: %v", err)
 	}
 
-	if err := g.Render(ctx, graph, "dot", &buf); err != nil {
-		log.Fatal(err)
-	}
+	// fmt.Println("rendering")
+	// if err := g.Render(ctx, graph, "dot", &buf); err != nil {
+	// 	log.Fatal(err)
+	// }
 	return path, coordPath
 }
 
@@ -199,10 +204,34 @@ func check(s state, b block) result {
 	}
 	return CONTINUE
 }
+
 func opposite(d1, d2 direction) bool {
 	return (min(d1, d2) == UP && max(d1, d2) == DOWN) || (max(d1, d2) == RIGHT && min(d1, d2) == LEFT)
 }
 
 func (vn *visitedNode) String() string {
-	return fmt.Sprintf("%d,%d,%d,%d", vn.bx1, vn.by1, vn.bx2, vn.by2)
+	str := fmt.Sprintf("%d,%d,%d,%d+B[", vn.bx1, vn.by1, vn.bx2, vn.by2)
+	ary := make([][2]int, len(vn.sNode.onButtonTiles))
+	i := 0
+	for b := range vn.sNode.onButtonTiles {
+		ary[i] = b
+		i++
+	}
+	slices.SortFunc(ary, func(a, b [2]int) int {
+		switch {
+		case a[0] == b[0] && a[1] == b[1]:
+			return 0
+		case a[0] < b[0]:
+			return -1
+		case a[0] > b[0]:
+			return 1
+		case a[1] < b[1]:
+			return -1
+		}
+		return 1
+	})
+	for _, ar := range ary {
+		str += fmt.Sprintf("(%d,%d)", ar[0], ar[1])
+	}
+	return str + "]"
 }

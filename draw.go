@@ -1,13 +1,20 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
+
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
 )
 
-func DrawGame(ap *ansipixels.AnsiPixels, s state) {
+func DrawGame(ap *ansipixels.AnsiPixels, s *state) {
+	// ap.ClearScreen()
 	ap.WriteBg(tcolor.Gray.Color())
-	for c := range s.floor {
+	for c, e := range s.floor {
+		if !e {
+			continue
+		}
 		ap.WriteAt(c[1], c[0], " ")
 	}
 	ap.WriteBg(tcolor.Red.Color())
@@ -27,4 +34,10 @@ func DrawGame(ap *ansipixels.AnsiPixels, s state) {
 	}
 
 	ap.WriteBg(ap.Background.Color())
+	str := ""
+	for c, b := range s.buttons {
+		str += fmt.Sprintf("%d,%d=%v", c[0], c[1], b.on)
+	}
+	ap.WriteAt(ap.W-25, ap.H-5, strconv.Itoa(len(s.floor))+str)
+
 }
