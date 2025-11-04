@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"image/png"
@@ -194,7 +195,7 @@ outer:
 	}
 	slices.Reverse(path)
 	slices.Reverse(coordPath)
-	// var buf bytes.Buffer
+	var buf bytes.Buffer
 
 	img, err := g.RenderImage(ctx, graph)
 	if err != nil {
@@ -214,10 +215,15 @@ outer:
 		log.Fatalf("failed to encode image: %v", err)
 	}
 
-	// fmt.Println("rendering")
-	// if err := g.Render(ctx, graph, "dot", &buf); err != nil {
-	// 	log.Fatal(err)
-	// }
+	fmt.Println("rendering")
+	if err := g.Render(ctx, graph, "dot", &buf); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(buf.String())
+	f, _ := os.Create("graph.dot")
+	f.WriteString((buf.String()))
+	f.Close()
+
 	return path, coordPath
 }
 
