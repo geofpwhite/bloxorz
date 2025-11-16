@@ -28,8 +28,7 @@ type visitedNode struct {
 	bx1, by1, bx2, by2 int
 }
 
-//nolint:gocognit,gocyclo,funlen,maintidx //Doing a lot, going to get hairy
-func solve(s state) ([]string, [][][2]int) {
+func solve(s state) ([]string, [][][2]int) { //nolint:gocognit,gocyclo,funlen,maintidx //Doing a lot, going to get hairy
 	ctx := context.Background()
 	g, err := graphviz.New(ctx)
 	if err != nil {
@@ -42,9 +41,11 @@ func solve(s state) ([]string, [][][2]int) {
 	}
 	defer func() {
 		if closeErr := graph.Close(); closeErr != nil {
-			panic(closeErr)
+			fmt.Println(closeErr)
 		}
-		g.Close()
+		if closeErr := g.Close(); closeErr != nil {
+			fmt.Println(closeErr)
+		}
 	}()
 	queue := make([]solverNode, 0)
 	start := solverNode{visitedNode{
@@ -67,9 +68,9 @@ func solve(s state) ([]string, [][][2]int) {
 	nodes := make(map[string]*cgraph.Node)
 	edges := make(map[string]*cgraph.Edge)
 	var done *solverNode
-	gN, _ := graph.CreateNodeByName(queue[0].visitedNode.String())
+	gN, _ := graph.CreateNodeByName(queue[0].String())
 	gQueue = append(gQueue, gN)
-	nodes[queue[0].visitedNode.String()] = gN
+	nodes[queue[0].String()] = gN
 outer:
 	for len(queue) > 0 {
 		cur := queue[0]
@@ -79,7 +80,7 @@ outer:
 		n := gQueue[0]
 		gQueue = gQueue[1:]
 		var buttonPressed bool
-		visited[cur.visitedNode.String()] = cur.curPath
+		visited[cur.String()] = cur.curPath
 		for _, b := range s.buttons {
 			if b.on {
 				b.press()
@@ -88,7 +89,6 @@ outer:
 		for c := range cur.onButtonTiles {
 			s.buttons[c].press()
 		}
-		// g := graph.
 		for i := range 4 {
 			d := direction(i)
 			if cur.prevMove != nil && opposite(*cur.prevMove, d) && !buttonPressed {
