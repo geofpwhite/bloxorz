@@ -213,7 +213,7 @@ outer:
 		return nil, nil
 	}
 
-	defer file.Close() //nolint:errcheck // As per documentation
+	defer file.Close() //nolint:errcheck //As per documentation
 
 	fmt.Println("encoding")
 	err = png.Encode(file, img)
