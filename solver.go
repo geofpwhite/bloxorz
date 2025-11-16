@@ -155,12 +155,12 @@ outer:
 			checkVal := check(s, newBlock)
 			fmt.Println(len(s.floor), len(newNode.onButtonTiles), checkVal, newBlock.coords, d.String())
 			var node *cgraph.Node
-			node, err = graph.CreateNodeByName(newNode.visitedNode.String())
+			node, err = graph.CreateNodeByName(newNode.String())
 			if err != nil {
 				panic("error creating node")
 			}
-			nodes[newNode.visitedNode.String()] = node
-			key := cur.visitedNode.String() + "-" + newNode.String()
+			nodes[newNode.String()] = node
+			key := cur.String() + "-" + newNode.String()
 			var e *cgraph.Edge
 			e, err = graph.CreateEdgeByName(key, n, node)
 			if err != nil {
@@ -213,7 +213,7 @@ outer:
 		return nil, nil
 	}
 
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // As per documentation
 
 	fmt.Println("encoding")
 	err = png.Encode(file, img)
