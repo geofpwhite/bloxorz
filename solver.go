@@ -55,7 +55,7 @@ func solve(s state) ([]string, [][][2]int) { //nolint:gocognit,gocyclo,funlen,ma
 		bx2:   -1,
 		by2:   -1,
 	}, nil, nil, nil, 0, make(map[[2]int]struct{})}
-	start.visitedNode.sNode = &start
+	start.sNode = &start
 	queue = append(queue, start)
 	gQueue := make([]*cgraph.Node, 0)
 	bQueue := make([]block, 0)
@@ -110,7 +110,7 @@ outer:
 				prevBlock:     &b,
 				onButtonTiles: m,
 			}
-			newNode.visitedNode.sNode = &newNode
+			newNode.sNode = &newNode
 			if len(newBlock.coords) > 1 {
 				newNode.bx2 = newBlock.coords[1][0]
 				newNode.by2 = newBlock.coords[1][1]
