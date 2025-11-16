@@ -14,6 +14,8 @@ func main() {
 	ap := ansipixels.NewAnsiPixels(60)
 	level := LevelOne
 	switch *levelFlag {
+	case 1:
+		level = LevelOne
 	case 2:
 		level = LevelTwo
 	}
@@ -26,7 +28,7 @@ func main() {
 		}()
 	}
 	curSteps := make([]direction, 0)
-	ap.Open()
+	_ = ap.Open()
 	ap.HideCursor()
 	ap.ClearScreen()
 	defer func() {
@@ -34,7 +36,7 @@ func main() {
 		ap.ShowCursor()
 		ap.Restore()
 	}()
-	ap.FPSTicks(func() bool {
+	err := ap.FPSTicks(func() bool {
 		if len(ap.Data) > 0 && ap.Data[0] == 'q' {
 			return false
 		}
@@ -65,8 +67,12 @@ func main() {
 			s = level()
 		case WIN:
 			return false
+		case CONTINUE:
 		}
 		DrawGame(ap, &s)
 		return true
 	})
+	if err != nil {
+		fmt.Println(err)
+	}
 }

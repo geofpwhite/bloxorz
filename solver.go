@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"image/png"
-	"log"
 	"maps"
 	"os"
 	"slices"
@@ -29,6 +28,7 @@ type visitedNode struct {
 	bx1, by1, bx2, by2 int
 }
 
+//nolint:gocognit,gocyclo,funlen,maintidx //Doing a lot, going to get hairy
 func solve(s state) ([]string, [][][2]int) {
 	ctx := context.Background()
 	g, err := graphviz.New(ctx)
@@ -41,20 +41,29 @@ func solve(s state) ([]string, [][][2]int) {
 		panic(err)
 	}
 	defer func() {
-		if err := graph.Close(); err != nil {
-			panic(err)
+		if closeErr := graph.Close(); closeErr != nil {
+			panic(closeErr)
 		}
 		g.Close()
 	}()
 	queue := make([]solverNode, 0)
-	start := solverNode{visitedNode{nil, s.block.coords[0][0], s.block.coords[0][1], -1, -1}, nil, nil, nil, 0, make(map[[2]int]struct{})}
+	start := solverNode{visitedNode{
+		sNode: nil,
+		bx1:   s.block.coords[0][0],
+		by1:   s.block.coords[0][1],
+		bx2:   -1,
+		by2:   -1,
+	}, nil, nil, nil, 0, make(map[[2]int]struct{})}
 	start.visitedNode.sNode = &start
 	queue = append(queue, start)
 	gQueue := make([]*cgraph.Node, 0)
 	bQueue := make([]block, 0)
 	visited := make(map[string]int)
-	block := block{coords: [][2]int{{4, 1}}, orientation: UPRIGHT}
-	bQueue = append(bQueue, block)
+	startBlock := block{
+		coords:      s.block.coords,
+		orientation: UPRIGHT,
+	}
+	bQueue = append(bQueue, startBlock)
 	nodes := make(map[string]*cgraph.Node)
 	edges := make(map[string]*cgraph.Edge)
 	var done *solverNode
@@ -70,10 +79,6 @@ outer:
 		n := gQueue[0]
 		gQueue = gQueue[1:]
 		var buttonPressed bool
-		// if num, ok := visited[cur.visitedNode.String()]; ok && num < cur.curPath {
-		// 	fmt.Println(num, cur.curPath)
-		// 	continue
-		// }
 		visited[cur.visitedNode.String()] = cur.curPath
 		for _, b := range s.buttons {
 			if b.on {
@@ -92,8 +97,10 @@ outer:
 			newBlock := b.Move(d)
 			m := make(map[[2]int]struct{})
 			maps.Copy(m, cur.onButtonTiles)
-			newNode := solverNode{prevMove: &d,
-				visitedNode: visitedNode{bx1: newBlock.coords[0][0],
+			newNode := solverNode{
+				prevMove: &d,
+				visitedNode: visitedNode{
+					bx1: newBlock.coords[0][0],
 					by1: newBlock.coords[0][1],
 					bx2: -1,
 					by2: -1,
@@ -108,25 +115,26 @@ outer:
 				newNode.bx2 = newBlock.coords[1][0]
 				newNode.by2 = newBlock.coords[1][1]
 			}
-			if button, ok := s.buttons[[2]int{newNode.bx1, newNode.by1}]; ok {
+			button, ok := s.buttons[[2]int{newNode.bx1, newNode.by1}]
+			if ok {
 				on := false
 				if (button.mustBeUpright && b.orientation == UPRIGHT) || !button.mustBeUpright {
 					coords := [2]int{newNode.bx1, newNode.by1}
-					if _, ok := newNode.onButtonTiles[coords]; ok {
+					if _, ok = newNode.onButtonTiles[coords]; ok {
 						fmt.Println("continue outer", len(newNode.onButtonTiles))
 						continue outer
-					} else {
-						newNode.onButtonTiles[coords] = struct{}{}
-						on = true
-						queue = queue[0:0]
-						gQueue = gQueue[0:0]
-						bQueue = bQueue[0:0]
 					}
+					newNode.onButtonTiles[coords] = struct{}{}
+					on = true
+					queue = queue[0:0]
+					gQueue = gQueue[0:0]
+					bQueue = bQueue[0:0]
 					buttonPressed = true
 					fmt.Println("button pressed", on)
 				}
 			}
-			if button, ok := s.buttons[[2]int{newNode.bx2, newNode.by2}]; ok && newNode.bx2 != -1 && newNode.by2 != -1 {
+			button, ok = s.buttons[[2]int{newNode.bx2, newNode.by2}]
+			if ok && newNode.bx2 != -1 && newNode.by2 != -1 {
 				on := false
 				if !button.mustBeUpright {
 					coords := [2]int{newNode.bx2, newNode.by2}
@@ -134,31 +142,27 @@ outer:
 						fmt.Println("continue outer", len(newNode.onButtonTiles))
 
 						continue
-					} else {
-						newNode.onButtonTiles[coords] = struct{}{}
-						on = true
-						queue = make([]solverNode, 0)
-						gQueue = make([]*cgraph.Node, 0)
-						bQueue = bQueue[0:0]
 					}
+					newNode.onButtonTiles[coords] = struct{}{}
+					on = true
+					queue = make([]solverNode, 0)
+					gQueue = make([]*cgraph.Node, 0)
+					bQueue = bQueue[0:0]
 					buttonPressed = true
 					fmt.Println("button pressed", on)
 				}
 			}
-			// if num, ok := visited[newNode.visitedNode.String()]; ok && num < newNode.curPath {
-			// 	fmt.Println(num, newNode.curPath)
-			// 	continue
-			// }
 			checkVal := check(s, newBlock)
 			fmt.Println(len(s.floor), len(newNode.onButtonTiles), checkVal, newBlock.coords, d.String())
-			node, err := graph.CreateNodeByName(newNode.visitedNode.String())
+			var node *cgraph.Node
+			node, err = graph.CreateNodeByName(newNode.visitedNode.String())
 			if err != nil {
 				panic("error creating node")
 			}
 			nodes[newNode.visitedNode.String()] = node
 			key := cur.visitedNode.String() + "-" + newNode.String()
-
-			e, err := graph.CreateEdgeByName(key, n, node)
+			var e *cgraph.Edge
+			e, err = graph.CreateEdgeByName(key, n, node)
 			if err != nil {
 				panic(err)
 			}
@@ -170,10 +174,11 @@ outer:
 				done = &newNode
 				fmt.Println("win")
 				break outer
+			case CONTINUE:
+				gQueue = append(gQueue, node)
+				queue = append(queue, newNode)
+				bQueue = append(bQueue, newBlock)
 			}
-			gQueue = append(gQueue, node)
-			queue = append(queue, newNode)
-			bQueue = append(bQueue, newBlock)
 		}
 	}
 	if done == nil {
@@ -204,7 +209,8 @@ outer:
 	fmt.Println("creating")
 	file, err := os.Create("output.png")
 	if err != nil {
-		log.Fatalf("failed to create file: %v", err)
+		fmt.Println(err)
+		return nil, nil
 	}
 
 	defer file.Close()
@@ -212,17 +218,22 @@ outer:
 	fmt.Println("encoding")
 	err = png.Encode(file, img)
 	if err != nil {
-		log.Fatalf("failed to encode image: %v", err)
+		fmt.Println(err)
+		return nil, nil
 	}
 
 	fmt.Println("rendering")
-	if err := g.Render(ctx, graph, "dot", &buf); err != nil {
-		log.Fatal(err)
+	if err = g.Render(ctx, graph, "dot", &buf); err != nil {
+		fmt.Println(err)
+		return nil, nil
 	}
 	fmt.Println(buf.String())
 	f, _ := os.Create("graph.dot")
-	f.WriteString((buf.String()))
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil
+	}
 
 	return path, coordPath
 }
@@ -265,7 +276,7 @@ func (vn *visitedNode) String() string {
 		return 1
 	})
 	for _, ar := range ary {
-		str += fmt.Sprintf("(%d,%d)", ar[0], ar[1])
+		str = fmt.Sprintf("%s(%d,%d)", str, ar[0], ar[1])
 	}
 	return str + "]"
 }
