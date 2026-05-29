@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 
 	"fortio.org/terminal/ansipixels"
 )
 
 func main() {
 	outputGraphFlag := flag.Bool("graph", false, "Graph state space of current level")
+	serveFlag := flag.Bool("serve", false, "Solve level and serve graph at localhost:8080")
 	levelFlag := flag.Int("level", 1, "choose your level")
 	flag.Parse()
 	ap := ansipixels.NewAnsiPixels(60)
@@ -20,8 +22,22 @@ func main() {
 		level = LevelTwo
 	}
 	s := level()
+	if *serveFlag {
+		path, coords, svg := solve(s)
+		fmt.Println(path)
+		fmt.Println(coords)
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/svg+xml")
+			w.Write(svg) //nolint:errcheck
+		})
+		fmt.Println("serving graph at http://localhost:8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
 	if *outputGraphFlag {
-		path, coords := solve(s)
+		path, coords, _ := solve(s)
 		defer func() {
 			fmt.Println(path)
 			fmt.Println(coords)

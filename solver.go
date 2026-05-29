@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"image/png"
 	"maps"
-	"os"
 	"slices"
 
 	"fortio.org/terminal/ansipixels/tcolor"
@@ -28,13 +26,12 @@ type visitedNode struct {
 	bx1, by1, bx2, by2 int
 }
 
-func solve(s state) ([]string, [][][2]int) { //nolint:gocognit,gocyclo,funlen,maintidx //Doing a lot, going to get hairy
+func solve(s state) ([]string, [][][2]int, []byte) { //nolint:gocognit,gocyclo,funlen,maintidx //Doing a lot, going to get hairy
 	ctx := context.Background()
 	g, err := graphviz.New(ctx)
 	if err != nil {
 		panic(err)
 	}
-
 	graph, err := g.Graph()
 	if err != nil {
 		panic(err)
@@ -182,7 +179,7 @@ outer:
 		}
 	}
 	if done == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	cur := done
 	finish := nodes[cur.String()]
@@ -200,42 +197,13 @@ outer:
 	}
 	slices.Reverse(path)
 	slices.Reverse(coordPath)
-	var buf bytes.Buffer
-
-	img, err := g.RenderImage(ctx, graph)
-	if err != nil {
-		panic("error rendering")
-	}
-	fmt.Println("creating")
-	file, err := os.Create("output.png")
-	if err != nil {
+	var svgBuf bytes.Buffer
+	if err = g.Render(ctx, graph, graphviz.SVG, &svgBuf); err != nil {
 		fmt.Println(err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	defer file.Close() //nolint:errcheck //As per documentation
-
-	fmt.Println("encoding")
-	err = png.Encode(file, img)
-	if err != nil {
-		fmt.Println(err)
-		return nil, nil
-	}
-
-	fmt.Println("rendering")
-	if err = g.Render(ctx, graph, "dot", &buf); err != nil {
-		fmt.Println(err)
-		return nil, nil
-	}
-	fmt.Println(buf.String())
-	f, _ := os.Create("graph.dot")
-	err = f.Close()
-	if err != nil {
-		fmt.Println(err)
-		return nil, nil
-	}
-
-	return path, coordPath
+	return path, coordPath, svgBuf.Bytes()
 }
 
 func check(s state, b block) result {
